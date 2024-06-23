@@ -7,10 +7,11 @@ import {
   TouchableOpacity,
   Image,
   StyleSheet,
-  Platform,
+  Alert,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
+import { Picker } from "@react-native-picker/picker";
 import axios from "axios";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../types";
@@ -27,61 +28,46 @@ const Home = () => {
   const [items, setItems] = useState<any[]>([]);
   const navigation = useNavigation<HomeScreenNavigationProp>();
 
-  const createFormData = (photoUri: string | null, body: any) => {
-    const data = new FormData();
+  const addItem = async () => {
+    const formData = new FormData();
+    formData.append("nombre", name);
+    formData.append("descripcion", description);
+    formData.append("estado", state);
+    formData.append("categoria", category);
+    formData.append("precio", price);
 
-    if (photoUri) {
-      const uri =
-        Platform.OS === "ios" ? photoUri.replace("file://", "") : photoUri;
-      const photo = {
-        uri,
-        type: "image/png",
-        name: "photo.png",
-      };
-
-      data.append("imagen", {
-        uri: photo.uri,
-        type: photo.type,
-        name: photo.name,
-      } as any); // Convertir a cualquier tipo para evitar errores de TypeScript
-
-      console.log("Imagen seleccionada:", photo);
+    if (image) {
+      const uriParts = image.split(".");
+      const fileType = uriParts[uriParts.length - 1];
+      formData.append("imagen", {
+        uri: image,
+        name: `photo.${fileType}`,
+        type: `image/${fileType}`,
+      } as any); // Agrega 'as any' para evitar el error de TypeScript
     }
 
-    Object.keys(body).forEach((key) => {
-      data.append(key, body[key]);
-    });
-
-    console.log("Body:", data);
-
-    return data;
-  };
-
-  const addItem = async () => {
-    const formData = createFormData(image, {
-      nombre: name,
-      descripcion: description,
-      estado: state,
-      categoria: category,
-      precio: price,
-    });
-
     try {
-      const response = await axios.post("http://localhost:4756/", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
+      const response = await fetch("http://localhost:4756/", {
+        method: "POST",
+        body: formData,
       });
-      console.log("Respuesta del servidor:", response.data);
-      setItems([...items, response.data]);
-      setName("");
-      setDescription("");
-      setState("");
-      setCategory("");
-      setPrice("");
-      setImage(null);
+
+      if (response.ok) {
+        const data = await response.json();
+        Alert.alert("Éxito", "Item guardado con éxito");
+        setItems([...items, data]);
+        setName("");
+        setDescription("");
+        setState("");
+        setCategory("");
+        setPrice("");
+        setImage(null);
+      } else {
+        const errorData = await response.json();
+        Alert.alert("Error", errorData.mensaje);
+      }
     } catch (error) {
-      console.error("Error al agregar el item:", error);
+      Alert.alert("Error", error.message);
     }
   };
 
@@ -101,13 +87,8 @@ const Home = () => {
       quality: 1,
     });
 
-    console.log("Resultado de ImagePicker:", result);
-
-    if (!result.cancelled) {
-      console.log("URI de la imagen seleccionada:", result.assets[0].uri); // Acceder correctamente a la URI de la imagen seleccionada
-      setImage(result.assets[0].uri); // Establecer la imagen seleccionada en el estado
-    } else {
-      console.log("Selección de imagen cancelada");
+    if (!result.canceled) {
+      setImage(result.assets[0].uri);
     }
   };
 
@@ -120,23 +101,27 @@ const Home = () => {
         style={styles.input}
       />
       <TextInput
-        placeholder="Descripción"
+        placeholder="Descripcion"
         value={description}
         onChangeText={setDescription}
         style={styles.input}
       />
-      <TextInput
-        placeholder="Estado"
-        value={state}
-        onChangeText={setState}
-        style={styles.input}
-      />
-      <TextInput
-        placeholder="Categoría"
-        value={category}
-        onChangeText={setCategory}
-        style={styles.input}
-      />
+      <Picker
+        selectedValue={state}
+        onValueChange={(itemValue) => setState(itemValue)}
+        style={styles.picker}
+      >
+        <Picker.Item label="Disponible" value="Disponible" />
+        <Picker.Item label="No disponible" value="No disponible" />
+      </Picker>
+      <Picker
+        selectedValue={category}
+        onValueChange={(itemValue) => setCategory(itemValue)}
+        style={styles.picker}
+      >
+        <Picker.Item label="Utencilios" value="Utencilios" />
+        <Picker.Item label="Herramientas" value="Herramientas" />
+      </Picker>
       <TextInput
         placeholder="Precio"
         value={price}
@@ -147,14 +132,18 @@ const Home = () => {
         {image ? (
           <Image source={{ uri: image }} style={styles.image} />
         ) : (
-          <Text>Fotografía del Item</Text>
+          <Text>Fotografía Item</Text>
         )}
       </TouchableOpacity>
-      <Button title="Guardar" onPress={addItem} />
-      <Button
-        title="Detalle de Items"
+      <TouchableOpacity style={styles.button} onPress={addItem}>
+        <Text style={styles.buttonText}>Guardar</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.button}
         onPress={() => navigation.navigate("Detail", { items })}
-      />
+      >
+        <Text style={styles.buttonText}>Detalles</Text>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -169,6 +158,7 @@ const styles = StyleSheet.create({
     borderColor: "#ccc",
     padding: 10,
     marginVertical: 10,
+    borderRadius: 10,
   },
   imageButton: {
     alignItems: "center",
@@ -177,10 +167,30 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#ccc",
     marginVertical: 10,
+    borderRadius: 10,
   },
   image: {
     width: 100,
     height: 100,
+    borderRadius: 10,
+  },
+  button: {
+    backgroundColor: "#007bff",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    marginVertical: 10,
+  },
+  buttonText: {
+    color: "#fff",
+    fontWeight: "bold",
+  },
+  picker: {
+    height: 50,
+    width: "100%",
+    marginBottom: 10,
+    borderRadius: 10,
   },
 });
 

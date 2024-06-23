@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from "react-native";
+import axios from "axios";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../types";
@@ -20,23 +21,47 @@ const Detalles = () => {
   const route = useRoute();
   const navigation = useNavigation<DetailScreenNavigationProp>();
   const { items } = route.params;
+  const [data, setData] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      const response = await axios.get("http://localhost:4756/");
+      setData(response.data);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    }
+  };
+
+  const navigateToItemDetail = (id) => {
+    navigation.navigate("ItemDetail", { id });
+  };
 
   const renderItem = ({ item }) => (
-    <View style={styles.itemContainer}>
-      <Text>{item.name}</Text>
-      <Text>{item.price}</Text>
-      <Text>{item.description}</Text>
-      <Button
-        title="Ver"
-        onPress={() => navigation.navigate("ItemDetail", { item })}
-      />
-    </View>
+    <TouchableOpacity
+      style={styles.itemContainer}
+      onPress={() => navigateToItemDetail(item.id)} 
+    >
+      <View style={styles.rowContainer}>
+        <Text style={styles.column}>{item.nombre}</Text>
+        <Text style={styles.column}>Precio: {item.precio}</Text>
+        <TouchableOpacity
+          style={styles.detailButton}
+          onPress={() => navigateToItemDetail(item.id)}
+        >
+          <Text style={styles.detailButtonText}>Ver detalle</Text>
+        </TouchableOpacity>
+      </View>
+    </TouchableOpacity>
   );
 
   return (
     <View style={styles.container}>
       <FlatList
-        data={items}
+        data={data}
         renderItem={renderItem}
         keyExtractor={(item, index) => index.toString()}
       />
@@ -54,6 +79,23 @@ const styles = StyleSheet.create({
     borderColor: "#ccc",
     padding: 10,
     marginVertical: 10,
+  },
+  rowContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  column: {
+    flex: 1,
+  },
+  detailButton: {
+    backgroundColor: "#007bff",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 5,
+  },
+  detailButtonText: {
+    color: "#fff",
   },
 });
 
