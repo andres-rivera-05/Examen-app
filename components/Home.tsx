@@ -7,9 +7,11 @@ import {
   TouchableOpacity,
   Image,
   StyleSheet,
+  Platform,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
+import axios from "axios";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../types";
 
@@ -25,15 +27,62 @@ const Home = () => {
   const [items, setItems] = useState<any[]>([]);
   const navigation = useNavigation<HomeScreenNavigationProp>();
 
-  const addItem = () => {
-    const newItem = { name, description, state, category, price, image };
-    setItems([...items, newItem]);
-    setName("");
-    setDescription("");
-    setState("");
-    setCategory("");
-    setPrice("");
-    setImage(null);
+  const createFormData = (photoUri: string | null, body: any) => {
+    const data = new FormData();
+
+    if (photoUri) {
+      const uri =
+        Platform.OS === "ios" ? photoUri.replace("file://", "") : photoUri;
+      const photo = {
+        uri,
+        type: "image/png",
+        name: "photo.png",
+      };
+
+      data.append("imagen", {
+        uri: photo.uri,
+        type: photo.type,
+        name: photo.name,
+      } as any); // Convertir a cualquier tipo para evitar errores de TypeScript
+
+      console.log("Imagen seleccionada:", photo);
+    }
+
+    Object.keys(body).forEach((key) => {
+      data.append(key, body[key]);
+    });
+
+    console.log("Body:", data);
+
+    return data;
+  };
+
+  const addItem = async () => {
+    const formData = createFormData(image, {
+      nombre: name,
+      descripcion: description,
+      estado: state,
+      categoria: category,
+      precio: price,
+    });
+
+    try {
+      const response = await axios.post("http://localhost:4756/", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+      console.log("Respuesta del servidor:", response.data);
+      setItems([...items, response.data]);
+      setName("");
+      setDescription("");
+      setState("");
+      setCategory("");
+      setPrice("");
+      setImage(null);
+    } catch (error) {
+      console.error("Error al agregar el item:", error);
+    }
   };
 
   const pickImage = async () => {
@@ -52,8 +101,13 @@ const Home = () => {
       quality: 1,
     });
 
-    if (!result.canceled) {
-      setImage(result.assets[0].uri);
+    console.log("Resultado de ImagePicker:", result);
+
+    if (!result.cancelled) {
+      console.log("URI de la imagen seleccionada:", result.assets[0].uri); // Acceder correctamente a la URI de la imagen seleccionada
+      setImage(result.assets[0].uri); // Establecer la imagen seleccionada en el estado
+    } else {
+      console.log("Selección de imagen cancelada");
     }
   };
 
@@ -66,7 +120,7 @@ const Home = () => {
         style={styles.input}
       />
       <TextInput
-        placeholder="Descripcion"
+        placeholder="Descripción"
         value={description}
         onChangeText={setDescription}
         style={styles.input}
@@ -78,7 +132,7 @@ const Home = () => {
         style={styles.input}
       />
       <TextInput
-        placeholder="Categoria"
+        placeholder="Categoría"
         value={category}
         onChangeText={setCategory}
         style={styles.input}
@@ -93,12 +147,12 @@ const Home = () => {
         {image ? (
           <Image source={{ uri: image }} style={styles.image} />
         ) : (
-          <Text>Fotografía Item</Text>
+          <Text>Fotografía del Item</Text>
         )}
       </TouchableOpacity>
       <Button title="Guardar" onPress={addItem} />
       <Button
-        title="Detalle Items"
+        title="Detalle de Items"
         onPress={() => navigation.navigate("Detail", { items })}
       />
     </View>
